@@ -1,0 +1,21 @@
+{
+"General": {
+  "Author": "Nombre Apellido",
+  "AuthorRole": "Cargo",
+  "ExtraInfo": "Datos complementarios",
+  "WebUrl": "URL Empresa"
+},
+  "Python": {
+    "InterpreterPath": "E:\\Python\\Python38-32\\python.exe"
+  },
+  "Styles": {
+    "H1": "Heading 1",
+    "H2": "Heading 2",
+    "H3": "Heading 3",
+    "Body": "Normal",
+    "Bullet": "List Bullet",
+    "Code": "Code",
+    "Caption": "Caption",
+    "Footer": "Footer"
+  }
+}

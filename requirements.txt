@@ -1,0 +1,6 @@
+python-docx>=0.8.11
+Pillow>=9.0.0
+lxml>=4.9.0
+pywin32>=300; sys_platform == "win32"
+# Dependencia opcional (instalar via npm, no pip):
+# npm install -g @mermaid-js/mermaid-cli
