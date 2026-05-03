@@ -599,11 +599,15 @@ def _insert_table_at(doc, headers, rows, add_table_fn):
         for ci, h in enumerate(headers):
             cell = table.rows[0].cells[ci]
             cell.text = ""
-            cell.paragraphs[0].add_run(h).bold = True
+            aplicar_inline(cell.paragraphs[0], h)
+            for run in cell.paragraphs[0].runs:
+                run.bold = True
         for ri, row in enumerate(rows):
             for ci, ct in enumerate(row):
                 if ci < nc:
-                    table.rows[ri + 1].cells[ci].text = ct
+                    cell = table.rows[ri + 1].cells[ci]
+                    cell.text = ""
+                    aplicar_inline(cell.paragraphs[0], ct)
     except Exception as e:
         print("[AVISO] Error inserting table: {}".format(e))
 
