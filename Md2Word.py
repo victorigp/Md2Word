@@ -77,7 +77,7 @@ def parse_markdown(md_path):
                 elements.append({"type": "code_block", "codigo": code, "lenguaje": lang})
             continue
         # Headings
-        m = re.match(r'^(#{1,3})\s+(.+)$', stripped)
+        m = re.match(r'^(#{1,4})\s+(.+)$', stripped)
         if m:
             level = len(m.group(1))
             heading_text = re.sub(r'^\d+(?:\.\d+)*\.?\s+', '', m.group(2).strip())
@@ -101,7 +101,7 @@ def parse_markdown(md_path):
                         i += 1; continue
                     break
             else:
-                elements.append({"type": "h{}".format(level), "texto": heading_text})
+                elements.append({"type": "h{}".format(min(level, 4)), "texto": heading_text})
             continue
         # Separator
         if re.match(r'^\s*---+\s*$', stripped) or re.match(r'^\s*\*\*\*+\s*$', stripped):
@@ -919,6 +919,10 @@ settings, debug=False):
                 if '_bookmark' in elem:
                     _add_bookmark_to_para(para._element,
                                           elem['_bookmark'], elem['_bm_id'])
+
+            elif etype == "h4":
+                para = _add_paragraph(style=safe_style(doc, settings, S_H3))
+                aplicar_inline(para, elem["texto"])
 
             elif etype in ("toc_heading", "toc"):
                 pass  # populated below by _update_sdt_toc
