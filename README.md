@@ -74,22 +74,32 @@ Md2Word\
 
 ## Flujo de trabajo
 
+### Opción 1: Flujo Automático (recomendado)
+
+1. **Ejecutar el script principal**:
+   ```bash
+   Md2Word.bat
+   ```
+   Este comando realiza los siguientes pasos automáticamente:
+   - Ejecuta `PrepararPlantilla.py` para analizar la plantilla y actualizar `Settings.json`.
+   - Convierte el archivo Markdown más reciente en `docs\` a un documento Word usando la plantilla más reciente.
+   - Genera el archivo de salida en `docs\` con un nombre basado en el título del Markdown.
+
+### Opción 2: Flujo Manual
+
 1. **Preparar la plantilla** (una sola vez por plantilla):
    ```bash
    python PrepararPlantilla.py docs\plantilla.docx
    ```
-   Analiza los estilos de la plantilla y actualiza `Settings.json`.
+   Esto analiza los estilos de la plantilla y actualiza `Settings.json`.
 
 2. **Revisar Settings.json** — ajustar datos de autor/empresa y confirmar el mapeo de estilos.
 
 3. **Ejecutar la conversión**:
    ```bash
-   Md2Word.bat
-   ```
-   O directamente:
-   ```bash
    python Md2Word.py docs\mi_documento.md docs\plantilla.docx docs\salida.docx
    ```
+   Esto convierte el archivo Markdown especificado en un documento Word usando la plantilla indicada.
 
 ## Comportamiento con la plantilla
 

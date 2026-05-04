@@ -62,6 +62,14 @@ echo  Plantilla: %TEMPLATE%
 echo  Salida   : %OUTPUT%
 echo ============================================================
 
+REM Ejecutar PrepararPlantilla.py para actualizar el mapa de estilos de Settings.json
+echo [INFO] Analizando estilos de la plantilla...
+"%PYTHON%" "%SCRIPT_DIR%PrepararPlantilla.py" "%TEMPLATE%"
+if %ERRORLEVEL% neq 0 (
+    echo [AVISO] PrepararPlantilla.py falló. Se usará el mapa de estilos existente en Settings.json.
+)
+
+echo.
 "%PYTHON%" "%SCRIPT_DIR%Md2Word.py" "%MD_FILE%" "%TEMPLATE%" "%OUTPUT%"
 
 if %ERRORLEVEL% neq 0 (
