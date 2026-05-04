@@ -3,7 +3,7 @@
 import sys, os, re, json, argparse, subprocess, tempfile, shutil
 from PIL import Image as PilImage
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn, nsdecls
 from docx.oxml import parse_xml, OxmlElement
@@ -588,6 +588,38 @@ def _insert_code_block(doc, codigo, lenguaje, settings, add_paragraph_fn):
         except Exception:
             pass
 
+def _get_normal_font_color(doc):
+    """Read the font color from Normal style's w:rPr/w:color/@w:val.
+    Returns a 6-char hex string (e.g. '191813'), or '000000' as fallback."""
+    try:
+        rPr = doc.styles['Normal'].element.find(qn('w:rPr'))
+        if rPr is not None:
+            color_el = rPr.find(qn('w:color'))
+            if color_el is not None:
+                val = color_el.get(qn('w:val'), '')
+                if val and val.lower() not in ('auto', ''):
+                    return val
+    except Exception:
+        pass
+    return '000000'
+
+
+def _contrast_color(hex_color):
+    """Return black or white RGBColor depending on which contrasts better
+    against hex_color, using the YIQ perceived-luminance formula.
+    Y = (R*299 + G*587 + B*114) / 1000
+    Y >= 128  -> dark background is light  -> use black text
+    Y <  128  -> background is dark        -> use white text
+    """
+    try:
+        h = hex_color.lstrip('#')
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        y = (r * 299 + g * 587 + b * 114) / 1000
+        return RGBColor(0, 0, 0) if y >= 128 else RGBColor(255, 255, 255)
+    except Exception:
+        return RGBColor(255, 255, 255)
+
+
 def _insert_table_at(doc, headers, rows, add_table_fn):
     try:
         nc = len(headers)
@@ -596,12 +628,25 @@ def _insert_table_at(doc, headers, rows, add_table_fn):
             table.style = "Table Grid"
         except Exception:
             pass
+
+        header_bg = _get_normal_font_color(doc)
+        text_color = _contrast_color(header_bg)
+
         for ci, h in enumerate(headers):
             cell = table.rows[0].cells[ci]
             cell.text = ""
             aplicar_inline(cell.paragraphs[0], h)
             for run in cell.paragraphs[0].runs:
                 run.bold = True
+                run.font.color.rgb = text_color
+            try:
+                cell._element.get_or_add_tcPr().append(
+                    parse_xml('<w:shd {} w:fill="{}" w:val="clear"/>'.format(
+                        nsdecls('w'), header_bg))
+                )
+            except Exception:
+                pass
+
         for ri, row in enumerate(rows):
             for ci, ct in enumerate(row):
                 if ci < nc:
