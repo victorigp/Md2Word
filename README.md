@@ -24,17 +24,18 @@ npm install -g @mermaid-js/mermaid-cli
 
 ```
 Md2Word\
-├── Md2Word.bat                     → Lanzador principal Windows
-├── Md2Word.py                      → Script principal de conversión
-├── PrepararPlantilla.py            → Analiza la plantilla y guarda mapa de estilos
-├── GetTitle.ps1                    → Extrae título H1 del .md
-├── Settings.json                   → Configuración general
-├── requirements.txt                → Dependencias Python
-├── README.md                       → Esta guía
+├── Md2Word.bat                         → Lanzador principal Windows
+├── Md2Word.py                          → Script principal de conversión
+├── PrepararPlantilla.py                → Analiza la plantilla y guarda mapa de estilos
+├── GetTitle.ps1                        → Extrae título H1 del .md
+├── Settings.json                       → Configuración general
+├── requirements.txt                    → Dependencias Python
+├── README.md                           → Esta guía
+├── PROMPT GENERACION MD ENTRADA.md     → Ejemplo de prompt para generar el Markdown de entrada con IA
 └── docs\
-    ├── ejemplo_entrada.md          → Documento Markdown a convertir
-    ├── ejemplo_plantilla.docx      → Plantilla corporativa
-    └── img\                        → Imágenes referenciadas desde el .md
+    ├── ejemplo_entrada.md              → Ejemplo de documento Markdown a convertir
+    ├── ejemplo_plantilla.docx          → Ejemplo de plantilla corporativa
+    └── img\                            → Imágenes referenciadas desde el .md
 ```
 
 ## Settings.json
@@ -73,6 +74,10 @@ Md2Word\
 | `Styles.*` | Mapeo de roles a nombres de estilo Word de la plantilla |
 
 ## Flujo de trabajo
+
+### Formato del Markdown de entrada
+
+Se puede usar el fichero `PROMPT GENERACION MD ENTRADA.md` en la raíz del proyecto para que una IA genere un MD con la referencia de sintaxis correcta. Ver también `docs\ejemplo_entrada.md`.
 
 ### Opción 1: Flujo Automático (recomendado)
 

@@ -1,3 +1,38 @@
+Tu objetivo es transformar el texto que te proporcionaré en una estructura Markdown optimizada para ser convertida directamente en un documento de word.
+
+Este sería el texto de partida:
+
+---
+INTRODUCIR TEXTO O REFERENCIA A FICHERO AQUÍ 
+---
+******
+
+El markdown que generes tiene que cumplir:
+
+### Referencia de sintaxis
+
+| Sintaxis | Resultado |
+|----------|-----------|
+| `# Título` | Título del documento (portada), no se repite en el cuerpo |
+| `## Sección` | Heading 1 numerado en el índice |
+| `### Subsección` | Heading 2 numerado en el índice |
+| `#### Subsección` | Heading 3 numerado en el índice |
+| `**texto**` / `__texto__` | Negrita |
+| `*texto*` / `_texto_` | Cursiva |
+| `~~texto~~` | Tachado |
+| `` `código` `` | Código inline |
+| `[texto](url)` | Enlace (texto sin hipervínculo externo) |
+| `![alt](ruta)` | Imagen insertada y escalada |
+| `- texto` / `  - texto` | Viñeta / subviñeta |
+| `1. texto` | Lista numerada |
+| ` ```lang … ``` ` | Bloque de código |
+| ` ```mermaid … ``` ` | Diagrama Mermaid renderizado (caption "Diagrama Mermaid N") |
+| `\| col \| col \|` | Tabla Word |
+| `---` | Separador |
+
+
+A continuación te pongo un markdown de ejemplo:
+
 # Título de ejemplo
 
 ## Primera sección

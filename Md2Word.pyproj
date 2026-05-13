@@ -33,6 +33,7 @@
     <Content Include="docs\img\image.png" />
     <Content Include="GetTitle.ps1" />
     <Content Include="Md2Word.bat" />
+    <Content Include="PROMPT GENERACION MD ENTRADA.md" />
     <Content Include="README.md" />
     <Content Include="requirements.txt" />
     <Content Include="Settings.json" />
