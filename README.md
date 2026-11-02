@@ -35,7 +35,7 @@ Md2Word\
 └── docs\
     ├── ejemplo_entrada.md              → Ejemplo de documento Markdown a convertir
     ├── ejemplo_plantilla.docx          → Ejemplo de plantilla corporativa
-    └── img\                            → Imágenes referenciadas desde el .md
+    └── media\                          → Imágenes referenciadas desde el .md
 ```
 
 ## Settings.json
@@ -152,6 +152,7 @@ El título "Índice" usa el formato visual del Heading 1 de la plantilla pero co
 | ` ```mermaid … ``` ` | Diagrama Mermaid renderizado (caption "Diagrama Mermaid N") |
 | `\| col \| col \|` | Tabla Word |
 | `---` | Separador |
+| `> [!NOTE]` / `> [!TIP]` / `> [!WARNING]` | Cuadro de alerta / nota destacado con fondo y borde de color |
 | Sección `# Índice` / `# Index` | Marca dónde insertar el TOC |
 
 ## Diagramas Mermaid

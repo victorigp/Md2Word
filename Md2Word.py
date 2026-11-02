@@ -5,6 +5,7 @@ from PIL import Image as PilImage
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn, nsdecls
 from docx.oxml import parse_xml, OxmlElement
 
@@ -15,6 +16,44 @@ STYLE_DEFAULTS = {
     S_BODY: "Normal", S_BULLET: "List Bullet", S_CODE: "Code",
     S_CAPTION: "Caption", S_FOOTER: "Footer",
 }
+ALERT_CONFIGS = {
+    "NOTE": {
+        "title": "Note",
+        "bg": "D9EDF7",
+        "border": "BCE8F1",
+        "accent": "31708F",
+        "text_rgb": RGBColor(0x31, 0x70, 0x8F),
+    },
+    "TIP": {
+        "title": "Tip",
+        "bg": "DFF0D8",
+        "border": "D6E9C6",
+        "accent": "3C763D",
+        "text_rgb": RGBColor(0x3C, 0x76, 0x3D),
+    },
+    "IMPORTANT": {
+        "title": "Important",
+        "bg": "D9EDF7",
+        "border": "BCE8F1",
+        "accent": "31708F",
+        "text_rgb": RGBColor(0x31, 0x70, 0x8F),
+    },
+    "WARNING": {
+        "title": "Warning",
+        "bg": "FCF8E3",
+        "border": "FAEBCC",
+        "accent": "8A6D3B",
+        "text_rgb": RGBColor(0x8A, 0x6D, 0x3B),
+    },
+    "CAUTION": {
+        "title": "Caution",
+        "bg": "F2DEDE",
+        "border": "EBCCD1",
+        "accent": "A94442",
+        "text_rgb": RGBColor(0xA9, 0x44, 0x42),
+    },
+}
+
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Settings.json")
 MAX_IMG_WIDTH_INCHES  = 6.0
 MAX_IMG_HEIGHT_INCHES = 7.5
@@ -107,13 +146,86 @@ def parse_markdown(md_path):
         if re.match(r'^\s*---+\s*$', stripped) or re.match(r'^\s*\*\*\*+\s*$', stripped):
             elements.append({"type": "separator"})
             i += 1; continue
+        # Skip HTML container tags (div, center, lone /p)
+        if re.match(r'^\s*</?(?:div|center)\b[^>]*>\s*$', stripped, re.IGNORECASE) or re.match(r'^\s*</p>\s*$', stripped, re.IGNORECASE):
+            i += 1; continue
+        # Markdown caption: *Tabla 1: ...*, *Código 1. ...*, etc.
+        m = re.match(r'^\s*[_*]([^*_]+)[_*]\s*$', stripped)
+        if m:
+            txt = m.group(1).strip()
+            if re.match(r'^(?:Tabla|Table|Código|Code|Diagrama|Diagram|Ilustración|Figura|Figure)\s+\d+', txt, re.IGNORECASE):
+                elements.append({"type": "caption", "texto": txt})
+                i += 1; continue
+        # HTML image or caption block: <p align="center">... or <img ...>
+        if re.match(r'^\s*<p\b', stripped, re.IGNORECASE) or re.match(r'^\s*<img\b', stripped, re.IGNORECASE):
+            html_block = [stripped]
+            k = i
+            if "</p>" not in stripped.lower() and not re.match(r'^\s*<img\b[^>]*/>\s*$', stripped, re.IGNORECASE):
+                k = i + 1
+                while k < len(lines) and k < i + 10:
+                    html_block.append(lines[k].strip())
+                    if "</p>" in lines[k].lower():
+                        break
+                    k += 1
+            combined = " ".join(html_block)
+
+            # Check for image tag inside HTML block
+            src_m = re.search(r'<img\b[^>]*src=[\'"]([^\'"]+)[\'"]', combined, re.IGNORECASE)
+            if src_m:
+                ruta = src_m.group(1)
+                alt_m = re.search(r'alt=[\'"]([^\'"]*)[\'"]', combined, re.IGNORECASE)
+                alt = alt_m.group(1) if alt_m else ""
+                if not alt:
+                    em_m = re.search(r'<em>(.*?)</em>', combined, re.IGNORECASE | re.DOTALL)
+                    if em_m:
+                        alt = re.sub(r'<[^>]+>', '', em_m.group(1)).strip()
+                if not os.path.isabs(ruta):
+                    resolved = os.path.normpath(os.path.join(base_dir, ruta))
+                    if not os.path.exists(resolved):
+                        fname = os.path.basename(ruta)
+                        for sub in ["img", "media"]:
+                            cand = os.path.join(base_dir, sub, fname)
+                            if os.path.exists(cand):
+                                resolved = cand
+                                break
+                        if not os.path.exists(resolved) and os.path.exists(os.path.join(base_dir, fname)):
+                            resolved = os.path.join(base_dir, fname)
+                    ruta = resolved
+                elements.append({"type": "image", "ruta": ruta, "alt": alt})
+                i = k + 1
+                continue
+
+            # Check for caption inside HTML block: <p align="center"><em>...</em></p>
+            em_m = re.search(r'<em>(.*?)</em>', combined, re.IGNORECASE | re.DOTALL)
+            if em_m:
+                cap_text = re.sub(r'<[^>]+>', '', em_m.group(1)).strip()
+                elements.append({"type": "caption", "texto": cap_text})
+                i = k + 1
+                continue
+
+            # Plain text inside HTML block
+            text = re.sub(r'<[^>]+>', '', combined).strip()
+            if text:
+                elements.append({"type": "text", "texto": text})
+            i = k + 1
+            continue
         # Image
         m = re.match(r'^!\[([^\]]*)\]\(([^)"\s]+)(?:\s+"[^"]*")?\)', stripped)
         if m:
             alt = m.group(1)
             ruta = m.group(2)
             if not os.path.isabs(ruta):
-                ruta = os.path.normpath(os.path.join(base_dir, ruta))
+                resolved = os.path.normpath(os.path.join(base_dir, ruta))
+                if not os.path.exists(resolved):
+                    fname = os.path.basename(ruta)
+                    for sub in ["img", "media"]:
+                        cand = os.path.join(base_dir, sub, fname)
+                        if os.path.exists(cand):
+                            resolved = cand
+                            break
+                    if not os.path.exists(resolved) and os.path.exists(os.path.join(base_dir, fname)):
+                        resolved = os.path.join(base_dir, fname)
+                ruta = resolved
             elements.append({"type": "image", "ruta": ruta, "alt": alt})
             i += 1; continue
         # Table
@@ -128,6 +240,87 @@ def parse_markdown(md_path):
                                  lines[i].strip().strip("|").split("|")])
                     i += 1
                 elements.append({"type": "table", "headers": headers, "rows": rows})
+                continue
+        # Alerts & Blockquotes: > [!NOTE], > [!TIP], > [!WARNING], etc.
+        if stripped.strip().startswith(">"):
+            m_alert = re.match(r'^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$', stripped.strip(), re.IGNORECASE)
+            if m_alert:
+                alert_type = m_alert.group(1).upper()
+                custom_title = m_alert.group(2).strip()
+                title = custom_title if custom_title else alert_type.capitalize()
+                alert_lines = []
+                i += 1
+                while i < len(lines):
+                    peek = lines[i].rstrip("\r\n")
+                    peek_s = peek.strip()
+                    if peek_s.startswith(">"):
+                        content = re.sub(r'^\s*>\s?', '', peek)
+                        alert_lines.append(content)
+                        i += 1
+                    elif not peek_s:
+                        if i + 1 < len(lines) and lines[i + 1].strip().startswith(">"):
+                            alert_lines.append("")
+                            i += 1
+                        else:
+                            break
+                    elif alert_lines and not any(peek_s.startswith(p) for p in ['#', '```', '|', '---', '***', '1.', '- ', '* ']):
+                        alert_lines.append(peek_s)
+                        i += 1
+                    else:
+                        break
+
+                paragraphs = []
+                current_p = []
+                for al in alert_lines:
+                    als = al.strip()
+                    if not als:
+                        if current_p:
+                            paragraphs.append(" ".join(current_p))
+                            current_p = []
+                    else:
+                        current_p.append(als)
+                if current_p:
+                    paragraphs.append(" ".join(current_p))
+
+                elements.append({
+                    "type": "alert",
+                    "alert_type": alert_type,
+                    "title": title,
+                    "paragraphs": paragraphs
+                })
+                continue
+            else:
+                # Regular blockquote
+                quote_lines = []
+                while i < len(lines):
+                    peek = lines[i].rstrip("\r\n")
+                    peek_s = peek.strip()
+                    if peek_s.startswith(">"):
+                        content = re.sub(r'^\s*>\s?', '', peek)
+                        quote_lines.append(content)
+                        i += 1
+                    elif not peek_s and i + 1 < len(lines) and lines[i + 1].strip().startswith(">"):
+                        quote_lines.append("")
+                        i += 1
+                    elif quote_lines and not any(peek_s.startswith(p) for p in ['#', '```', '|', '---', '***', '1.', '- ', '* ']):
+                        quote_lines.append(peek_s)
+                        i += 1
+                    else:
+                        break
+                paragraphs = []
+                current_p = []
+                for ql in quote_lines:
+                    qls = ql.strip()
+                    if not qls:
+                        if current_p:
+                            paragraphs.append(" ".join(current_p))
+                            current_p = []
+                    else:
+                        current_p.append(qls)
+                if current_p:
+                    paragraphs.append(" ".join(current_p))
+                if paragraphs:
+                    elements.append({"type": "blockquote", "paragraphs": paragraphs})
                 continue
         # Numbered list
         m = re.match(r'^(\d+)\.\s+(.+)$', stripped)
@@ -561,6 +754,18 @@ def find_insertion_point(doc, debug=False):
 def _insert_image_at(doc, ruta, alt, settings, add_paragraph_fn, width_inches=None):
     try:
         if not os.path.exists(ruta):
+            fname = os.path.basename(ruta)
+            dname = os.path.dirname(ruta)
+            pdir = os.path.dirname(dname) if dname else ""
+            for cand in [
+                os.path.join(pdir, "img", fname) if pdir else None,
+                os.path.join(pdir, "media", fname) if pdir else None,
+                os.path.join(pdir, fname) if pdir else None,
+            ]:
+                if cand and os.path.exists(cand):
+                    ruta = cand
+                    break
+        if not os.path.exists(ruta):
             print("[AVISO] Image not found: {}".format(ruta)); return
         if width_inches is None:
             width_inches = get_scaled_width(ruta)
@@ -570,9 +775,64 @@ def _insert_image_at(doc, ruta, alt, settings, add_paragraph_fn, width_inches=No
         if alt:
             cap = add_paragraph_fn(style=safe_style(doc, settings, S_CAPTION))
             cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            cap.add_run(alt)
+            aplicar_inline(cap, alt)
     except Exception as e:
         print("[AVISO] Error inserting image '{}': {}".format(ruta, e))
+
+def _insert_alert_box(doc, alert_type, title, paragraphs, add_table_fn):
+    config = ALERT_CONFIGS.get(alert_type.upper(), ALERT_CONFIGS["NOTE"])
+    tbl = add_table_fn(rows=1, cols=1)
+    try:
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    except Exception:
+        pass
+    tbl.autofit = False
+
+    cell = tbl.rows[0].cells[0]
+    cell.width = Inches(6.2)
+
+    # Shading (background color matching CSS .alert-info)
+    shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{config["bg"]}" w:val="clear"/>')
+    cell._element.get_or_add_tcPr().append(shd)
+
+    # Padding (margins matching CSS .alert padding: 15px)
+    tcMar = parse_xml(f'''<w:tcMar {nsdecls("w")}>
+      <w:top w:w="180" w:type="dxa"/>
+      <w:left w:w="220" w:type="dxa"/>
+      <w:bottom w:w="180" w:type="dxa"/>
+      <w:right w:w="220" w:type="dxa"/>
+    </w:tcMar>''')
+    cell._element.get_or_add_tcPr().append(tcMar)
+
+    # Borders: 1px outline in border-color with 3px solid accent bar on left
+    tblBorders = parse_xml(f'''<w:tblBorders {nsdecls("w")}>
+      <w:top w:val="single" w:sz="6" w:space="0" w:color="{config["border"]}"/>
+      <w:left w:val="single" w:sz="24" w:space="0" w:color="{config["accent"]}"/>
+      <w:bottom w:val="single" w:sz="6" w:space="0" w:color="{config["border"]}"/>
+      <w:right w:val="single" w:sz="6" w:space="0" w:color="{config["border"]}"/>
+    </w:tblBorders>''')
+    tbl._tbl.tblPr.append(tblBorders)
+
+    # Title paragraph (<h5>Note</h5>)
+    p0 = cell.paragraphs[0]
+    p0.paragraph_format.space_before = Pt(0)
+    p0.paragraph_format.space_after = Pt(4)
+    r0 = p0.add_run(title)
+    r0.bold = True
+    r0.font.size = Pt(10.5)
+    r0.font.color.rgb = config["text_rgb"]
+
+    # Content paragraphs (<p>...</p>)
+    for idx, p_text in enumerate(paragraphs):
+        p = cell.add_paragraph()
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(3) if idx < len(paragraphs) - 1 else Pt(0)
+        aplicar_inline(p, p_text)
+        for run in p.runs:
+            run.font.size = Pt(9.5)
+            if run.font.color.rgb is None:
+                run.font.color.rgb = config["text_rgb"]
+
 
 def _insert_code_block(doc, codigo, lenguaje, settings, add_paragraph_fn):
     sname = safe_style(doc, settings, S_CODE)
@@ -624,6 +884,10 @@ def _insert_table_at(doc, headers, rows, add_table_fn):
     try:
         nc = len(headers)
         table = add_table_fn(rows=1 + len(rows), cols=nc)
+        try:
+            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        except Exception:
+            pass
         try:
             table.style = "Table Grid"
         except Exception:
@@ -691,7 +955,7 @@ def _set_txbx_para_text(paras, idx, text):
         para.remove(extra)
 
 
-def _update_cover(doc, doc_title, settings):
+def _update_cover(doc, doc_title, settings, doc_subtitle=""):
     ns_wps = 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape'
     gen     = settings.get('General', {})
     author  = gen.get('Author', '')
@@ -743,11 +1007,18 @@ def _update_cover(doc, doc_title, settings):
                         if i != src_idx:
                             para0.remove(r)
 
+            # Update Subtitle (paras[2]) and clear template instructions (paras[3])
+            if len(paras) >= 3:
+                _set_txbx_para_text(paras, 2, doc_subtitle)
+            if len(paras) >= 4:
+                _set_txbx_para_text(paras, 3, "")
+
     # --- Fallback branches (VML/AlternateContent): also replace placeholders ---
     # Some Word renderers show fallback text. Ensure both placeholders are handled:
     #   - clear "Titulo principal"
     #   - replace "ForFuture Sans 49 izquierda" with doc_title
     first_vivid_done = False
+    first_sub_done = False
     for t in ch0.iter(qn('w:t')):
         val = (t.text or '')
         low = val.lower()
@@ -759,6 +1030,14 @@ def _update_cover(doc, doc_title, settings):
                 first_vivid_done = True
             else:
                 t.text = ''
+        elif ('subtítulo texto complementario' in low) or ('subtitulo texto complementario' in low) or ('subt?tulo texto complementario' in low):
+            if not first_sub_done:
+                t.text = doc_subtitle
+                first_sub_done = True
+            else:
+                t.text = ''
+        elif 'forfuture sans 19 pt' in low:
+            t.text = ''
 
     _update_cover_header(doc, web_url)
     _update_content_footer(doc, doc_title)
@@ -862,7 +1141,30 @@ settings, debug=False):
     for elem in elements_to_remove:
         body.remove(elem)
 
-    doc_title = next((e["texto"] for e in elements if e["type"] == "h1"), "")
+    doc_title = ""
+    doc_subtitle = ""
+    h1_idx = None
+    sub_idx = None
+    sep_idx = None
+
+    for i, e in enumerate(elements):
+        if e["type"] == "h1":
+            h1_idx = i
+            doc_title = e["texto"]
+            break
+
+    if h1_idx is not None:
+        next_i = h1_idx + 1
+        if next_i < len(elements) and elements[next_i]["type"] == "text":
+            raw_sub = elements[next_i]["texto"].strip()
+            clean_sub = re.sub(r'^[\*_]+|[\*_]+$', '', raw_sub).strip()
+            doc_subtitle = clean_sub
+            sub_idx = next_i
+            if next_i + 1 < len(elements) and elements[next_i + 1]["type"] == "separator":
+                sep_idx = next_i + 1
+        elif next_i < len(elements) and elements[next_i]["type"] == "separator":
+            sep_idx = next_i
+
     mermaid_temps = []
     mermaid_counter = 0
 
@@ -893,16 +1195,14 @@ settings, debug=False):
         _insert_element(tbl)
         return Table(tbl, doc)
 
-    first_h1_skipped = False
-
     try:
-        for elem in elements:
+        for idx, elem in enumerate(elements):
+            if idx in (h1_idx, sub_idx, sep_idx):
+                continue
+
             etype = elem["type"]
 
             if etype == "h1":
-                if not first_h1_skipped:
-                    first_h1_skipped = True
-                    continue
                 para = _add_paragraph(style=safe_style(doc, settings, S_H1))
                 aplicar_inline(para, elem["texto"])
 
@@ -943,7 +1243,9 @@ settings, debug=False):
                         pass
 
             elif etype == "numbered":
-                para = _add_paragraph(style="List Number")
+                sname = "List Number" if style_exists(doc, "List Number") else safe_style(doc, settings, S_BODY)
+                para = _add_paragraph(style=sname)
+                para.add_run("{}. ".format(elem.get("numero", 1))).bold = True
                 aplicar_inline(para, elem["texto"])
 
             elif etype == "code_block":
@@ -952,7 +1254,9 @@ settings, debug=False):
                                    settings, _add_paragraph)
 
             elif etype == "image":
-                _insert_image_at(doc, elem["ruta"], elem.get("alt", ""),
+                has_next_caption = (idx + 1 < len(elements) and elements[idx + 1]["type"] == "caption")
+                cap_alt = "" if has_next_caption else elem.get("alt", "")
+                _insert_image_at(doc, elem["ruta"], cap_alt,
                                  settings, _add_paragraph)
 
             elif etype == "mermaid":
@@ -960,10 +1264,12 @@ settings, debug=False):
                 if png_path:
                     mermaid_temps.append(png_path)
                     mermaid_counter += 1
+                    has_next_caption = (idx + 1 < len(elements) and elements[idx + 1]["type"] == "caption")
+                    cap_alt = "" if has_next_caption else "Diagrama Mermaid {}".format(mermaid_counter)
                     _insert_image_at(
                         doc,
                         png_path,
-                        "Diagrama Mermaid {}".format(mermaid_counter),
+                        cap_alt,
                         settings,
                         _add_paragraph,
                     )
@@ -971,9 +1277,30 @@ settings, debug=False):
                     _insert_code_block(doc, elem["codigo"], "mermaid",
                                        settings, _add_paragraph)
 
+            elif etype == "caption":
+                para = _add_paragraph(style=safe_style(doc, settings, S_CAPTION))
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                aplicar_inline(para, elem["texto"])
+
             elif etype == "table":
                 _insert_table_at(doc, elem["headers"], elem["rows"],
                                  _add_table)
+
+            elif etype == "alert":
+                _insert_alert_box(doc, elem["alert_type"], elem["title"],
+                                  elem.get("paragraphs", []), _add_table)
+
+            elif etype == "blockquote":
+                for p_text in elem.get("paragraphs", []):
+                    para = _add_paragraph(style=safe_style(doc, settings, S_BODY))
+                    try:
+                        para._element.get_or_add_pPr().append(
+                            parse_xml('<w:ind {} w:left="720"/>'.format(nsdecls('w'))))
+                    except Exception:
+                        pass
+                    aplicar_inline(para, p_text)
+                    for r in para.runs:
+                        r.italic = True
 
             elif etype == "separator":
                 _add_paragraph(style="Normal")
@@ -984,7 +1311,7 @@ settings, debug=False):
             print("[DEBUG] SDT TOC updated: {}".format(result))
 
         # Update cover page text boxes
-        _update_cover(doc, doc_title, settings)
+        _update_cover(doc, doc_title, settings, doc_subtitle)
 
         doc.save(output_path)
         print("[OK] Document generated: {}".format(output_path))
